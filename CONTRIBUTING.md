@@ -15,7 +15,7 @@ pytest
 
 ### High Priority
 - **New language support** — Add patterns for Go, Rust, Java, Ruby, PHP, C#, etc.
-- **GitHub Action** — Wrap vibecheck in a reusable action
+- **GitHub Action** — Wrap vibechecker in a reusable action
 - **Pre-commit hook** — `.pre-commit-hooks.yaml`
 - **New pattern rules** — See `vibecheck/patterns.py` for examples
 

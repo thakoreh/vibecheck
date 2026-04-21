@@ -17,7 +17,7 @@ Catch anti-patterns, security issues, and get a vibe score.
 
 ```
 pip install vibechecker
-vibecheck scan .
+vibechecker scan .
 ```
 
 ## What it does
@@ -33,7 +33,7 @@ Then it gives you a **vibe score** from 0-100.
 ## Demo
 
 ```
-$ vibecheck scan ./src
+$ vibechecker scan ./src
 
 ╭─────────────────── Vibe Score ───────────────────╮
 │                                                   │
@@ -74,22 +74,22 @@ pip install vibechecker
 
 ```bash
 # Scan current directory
-vibecheck scan .
+vibechecker scan .
 
 # Scan specific directory
-vibecheck scan ./src
+vibechecker scan ./src
 
 # JSON output (for CI/CD)
-vibecheck scan . --json
+vibechecker scan . --json
 
 # Security issues only
-vibecheck scan . --security
+vibechecker scan . --security
 
 # Skip security checks
-vibecheck scan . --no-security
+vibechecker scan . --no-security
 
 # Ignore directories
-vibecheck scan . --ignore vendor --ignore generated
+vibechecker scan . --ignore vendor --ignore generated
 ```
 
 ### Exit Codes
@@ -107,8 +107,8 @@ Perfect for CI pipelines:
 - name: VibeChecker
   run: |
     pip install vibechecker
-    vibecheck scan . --json > vibecheck-report.json
-    vibecheck scan .
+    vibechecker scan . --json > vibecheck-report.json
+    vibechecker scan .
 ```
 
 ## Languages Supported
