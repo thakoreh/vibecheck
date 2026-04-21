@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vibechecker"
-version = "0.1.0"
+version = "0.1.1"
 description = "Audit your AI-generated code. Catch anti-patterns, security issues, and get a vibe score."
 readme = "README.md"
 license = {text = "MIT"}
