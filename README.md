@@ -1,6 +1,6 @@
 <div align="center">
 
-# vibecheck
+# vibechecker
 
 **Audit your AI-generated code.**
 
@@ -22,7 +22,7 @@ vibecheck scan .
 
 ## What it does
 
-VibeCheck scans your codebase for patterns commonly found in AI-generated code:
+VibeChecker scans your codebase for patterns commonly found in AI-generated code:
 
 - **🚨 Security issues** — hardcoded secrets, eval(), SQL injection, shell=True, pickle.load
 - **⚠️ AI code smells** — generic exception handling, placeholder variable names, leftover console.log, TODO comments, magic numbers
@@ -104,7 +104,7 @@ Perfect for CI pipelines:
 
 ```yaml
 # GitHub Actions
-- name: VibeCheck
+- name: VibeChecker
   run: |
     pip install vibechecker
     vibecheck scan . --json > vibecheck-report.json
@@ -142,7 +142,7 @@ We welcome contributions! Especially:
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-## Why "vibecheck"?
+## Why "vibechecker"?
 
 Because "vibe coding" is how most of us use AI now. Ship fast, but know what you shipped.
 
