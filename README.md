@@ -6,8 +6,8 @@
 
 Catch anti-patterns, security issues, and get a vibe score.
 
-[![PyPI](https://img.shields.io/pypi/v/vibecheck.svg)](https://pypi.org/project/vibecheck/)
-[![Python](https://img.shields.io/pypi/pyversions/vibecheck.svg)](https://pypi.org/project/vibecheck/)
+[![PyPI](https://img.shields.io/pypi/v/vibechecker.svg)](https://pypi.org/project/vibechecker/)
+[![Python](https://img.shields.io/pypi/pyversions/vibechecker.svg)](https://pypi.org/project/vibechecker/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-9%20passing-green)](tests/)
 
@@ -16,7 +16,7 @@ Catch anti-patterns, security issues, and get a vibe score.
 ---
 
 ```
-pip install vibecheck
+pip install vibechecker
 vibecheck scan .
 ```
 
@@ -67,7 +67,7 @@ $ vibecheck scan ./src
 ## Install
 
 ```bash
-pip install vibecheck
+pip install vibechecker
 ```
 
 ## Usage
@@ -106,7 +106,7 @@ Perfect for CI pipelines:
 # GitHub Actions
 - name: VibeCheck
   run: |
-    pip install vibecheck
+    pip install vibechecker
     vibecheck scan . --json > vibecheck-report.json
     vibecheck scan .
 ```
