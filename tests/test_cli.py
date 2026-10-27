@@ -18,7 +18,8 @@ runner = CliRunner()
 @pytest.mark.parametrize("args,code", [(["--help"], 0), ([], 2), (["scan", "--help"], 0)])
 def test_help(args, code):
     result = runner.invoke(app, args)
-    assert result.exit_code == code
+    # Typer versions supported by Python 3.9 differ on no-argument help status.
+    assert result.exit_code in ({0, 2} if not args else {code})
     assert "Usage:" in result.output
 
 
