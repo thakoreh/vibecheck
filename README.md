@@ -85,6 +85,10 @@ with `python -m venv .venv`, activate it, then run the command above. On Windows
 activation is `.venv\Scripts\Activate.ps1`; on macOS/Linux, use
 `source .venv/bin/activate`. `vibechecker --version` shows the installed version.
 
+To upgrade an existing installation, run `python -m pip install --upgrade vibechecker`.
+See [CHANGELOG.md](CHANGELOG.md) for changes. A source version or GitHub tag alone
+does not update the package installed from PyPI.
+
 ## Usage
 
 ```bash

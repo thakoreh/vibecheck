@@ -63,7 +63,7 @@ and source-distribution installs outside the checkout. To test packaging locally
 ```bash
 pip install build
 python -m build
-pip install --force-reinstall --no-deps dist/vibechecker-0.1.1-py3-none-any.whl
+pip install --force-reinstall --no-deps dist/vibechecker-0.1.2-py3-none-any.whl
 python tests/package_smoke.py
 ```
 

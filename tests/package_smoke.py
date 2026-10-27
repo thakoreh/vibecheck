@@ -5,6 +5,7 @@ Run after installing the wheel or sdist into the active environment.
 """
 
 import json
+from importlib.metadata import version
 import os
 from pathlib import Path
 import subprocess
@@ -40,7 +41,7 @@ def main():
         assert checkout not in Path(origin).resolve().parents, origin
         run(["--help"], 0)
         run([], (0, 2))  # Older Typer on Python 3.9 returns 0 after showing help.
-        assert "vibechecker " in run(["--version"], 0)
+        assert run(["--version"], 0).strip() == f"vibechecker {version('vibechecker')}"
         target = root / "source.py"
         target.write_text("print('hello')\n", encoding="utf-8")
         assert json.loads(run(["scan", "--json"], 0))["files_scanned"] == 1
