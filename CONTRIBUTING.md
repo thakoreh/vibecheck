@@ -57,6 +57,19 @@ Add it to `AI_SMELLS` or `SECURITY_PATTERNS`, then add a test in `tests/test_sca
 pytest -v
 ```
 
+CI runs Python 3.9-3.14 on Linux and Python 3.13 on Windows, including wheel
+and source-distribution installs outside the checkout. To test packaging locally:
+
+```bash
+pip install build
+python -m build
+pip install --force-reinstall --no-deps dist/vibechecker-0.1.1-py3-none-any.whl
+python tests/package_smoke.py
+```
+
+Use an isolated virtual environment. The smoke test creates a temporary home
+and synthetic source files; it does not read agent sessions or contact providers.
+
 ## PR Process
 
 1. Fork the repo

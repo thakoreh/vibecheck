@@ -90,3 +90,78 @@ def test_json_output():
         assert "score" in output
         assert "issues" in output
         assert isinstance(output["issues"], list)
+
+
+def test_multiline_silent_exception(tmp_path):
+    target = _write_tmp(tmp_path, "silent.py", "try:\n    work()\nexcept ValueError:\n    pass\n")
+    matches = [f for f in scan_file(target, AI_SMELLS).findings if f.pattern.id == "pass-in-except"]
+    assert [f.line for f in matches] == [3]
+
+
+def test_long_function_at_eof_and_before_next_function(tmp_path):
+    content = "def calculate():\n" + "    step()\n" * 55
+    for ending in ("", "\ndef next_function():\n    pass\n"):
+        target = _write_tmp(tmp_path, "long.py", content + ending)
+        matches = [f for f in scan_file(target, AI_SMELLS).findings if f.pattern.id == "long-function"]
+        assert [f.line for f in matches] == [1]
+
+
+def test_python_comments_strings_and_used_import_are_not_dangerous_calls(tmp_path):
+    target = _write_tmp(tmp_path, "safe.py", '# eval(user_input)\nmessage = "eval(user_input)"\nimport os\nprint(os.name)\n')
+    matches = scan_file(target, AI_SMELLS + SECURITY_PATTERNS).findings
+    assert not {f.pattern.id for f in matches} & {"eval-usage", "unused-import"}
+
+
+def test_real_call_after_string_still_detected(tmp_path):
+    target = _write_tmp(tmp_path, "danger.py", 'message = "example"; eval(user_input)\n')
+    matches = [f for f in scan_file(target, SECURITY_PATTERNS).findings if f.pattern.id == "eval-usage"]
+    assert [f.line for f in matches] == [1]
+
+
+def test_unsupported_files_do_not_inflate_scan_metrics(tmp_path):
+    _write_tmp(tmp_path, "README.md", "hello\n")
+    _write_tmp(tmp_path, "source.py", "pass\n")
+    assert [Path(r.path).name for r in scan_directory(tmp_path, AI_SMELLS)] == ["source.py"]
+
+
+def test_ignore_applies_relative_to_target_not_ancestors(tmp_path):
+    target = tmp_path / "build" / "project"
+    _write_tmp(target, "source.py", "eval(user_input)\n")
+    assert len(scan_directory(target, SECURITY_PATTERNS)) == 1
+
+
+def test_ignore_prunes_generated_directories(tmp_path):
+    _write_tmp(tmp_path, "sample.egg-info/metadata.py", "eval(user_input)\n")
+    _write_tmp(tmp_path, "generated/danger.py", "eval(user_input)\n")
+    _write_tmp(tmp_path, "app.py", "pass\n")
+    assert len(scan_directory(tmp_path, SECURITY_PATTERNS, ignore=["generated"])) == 1
+
+
+def test_unsafe_yaml_loader_does_not_bypass_rule(tmp_path):
+    for loader in ("yaml.Loader", "yaml.UnsafeLoader"):
+        target = _write_tmp(tmp_path, "yaml_input.py", f"yaml.load(payload, Loader={loader})\n")
+        assert "unsafe-yaml" in {f.pattern.id for f in scan_file(target, SECURITY_PATTERNS).findings}
+    for loader in ("yaml.SafeLoader", "yaml.CSafeLoader"):
+        target = _write_tmp(tmp_path, "yaml_input.py", f"yaml.load(payload, Loader={loader})\n")
+        assert "unsafe-yaml" not in {f.pattern.id for f in scan_file(target, SECURITY_PATTERNS).findings}
+
+
+def test_invalid_encoding_fails_explicitly(tmp_path):
+    import pytest
+    from vibecheck.scanner import ScanError
+
+    target = tmp_path / "broken.py"
+    target.write_bytes(b"eval(\xff)\n")
+    with pytest.raises(ScanError, match="Cannot read"):
+        scan_file(target, SECURITY_PATTERNS)
+
+
+def test_eval_detected_in_every_supported_language(tmp_path):
+    for extension in (".py", ".js", ".jsx", ".ts", ".tsx"):
+        target = _write_tmp(tmp_path, "unsafe" + extension, "eval(user_input)\n")
+        assert "eval-usage" in {f.pattern.id for f in scan_file(target, SECURITY_PATTERNS).findings}
+
+
+def test_python_fstring_executable_interpolation_is_not_hidden(tmp_path):
+    target = _write_tmp(tmp_path, "interpolated.py", 'print(f"answer: {eval(user_input)}")\n')
+    assert "eval-usage" in {f.pattern.id for f in scan_file(target, SECURITY_PATTERNS).findings}

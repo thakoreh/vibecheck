@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import io
+import os
 import re
+import tokenize
 from dataclasses import dataclass, field
+from fnmatch import fnmatch
 from pathlib import Path
 from typing import Optional
 
@@ -45,10 +49,17 @@ SKIP_EXTENSIONS = {
 }
 
 MAX_FILE_SIZE = 500_000  # skip files > 500KB
+SUPPORTED_EXTENSIONS = {".py", ".js", ".jsx", ".ts", ".tsx"}
+
+
+class ScanError(Exception):
+    """The requested scan could not be completed."""
 
 
 def should_scan(path: Path) -> bool:
     """Check if a file should be scanned."""
+    if path.suffix not in SUPPORTED_EXTENSIONS:
+        return False
     if path.suffix in SKIP_EXTENSIONS:
         return False
     if any(part.endswith(".min.js") or part.endswith(".min.css") for part in path.parts):
@@ -56,8 +67,8 @@ def should_scan(path: Path) -> bool:
     try:
         if path.stat().st_size > MAX_FILE_SIZE:
             return False
-    except OSError:
-        return False
+    except OSError as exc:
+        raise ScanError(f"Cannot inspect {path}: {exc}") from exc
     return True
 
 
@@ -73,6 +84,30 @@ def get_language(path: Path) -> str:
     return ext_map.get(path.suffix, "unknown")
 
 
+def _python_code(content: str) -> str:
+    """Mask literal strings/comments for call rules, preserving source positions."""
+    lines = content.splitlines(keepends=True)
+    try:
+        for token in tokenize.generate_tokens(io.StringIO(content).readline):
+            if token.type not in (tokenize.STRING, tokenize.COMMENT, getattr(tokenize, "FSTRING_MIDDLE", -1)):
+                continue
+            if token.type == tokenize.STRING and re.match(r"(?i)^[rubf]*f[rubf]*['\"]", token.string):
+                # Python <=3.11 tokenizes whole f-strings as STRING; retain
+                # interpolations so executable calls are not hidden.
+                continue
+            (start_row, start_col), (end_row, end_col) = token.start, token.end
+            for row in range(start_row - 1, end_row):
+                start = start_col if row == start_row - 1 else 0
+                end = end_col if row == end_row - 1 else len(lines[row])
+                piece = lines[row][start:end]
+                masked = "".join("\n" if char == "\n" else " " for char in piece)
+                lines[row] = lines[row][:start] + masked + lines[row][end:]
+    except (tokenize.TokenError, IndentationError):
+        # Keep scanning incomplete source; tokens consumed so far are still masked.
+        pass
+    return "".join(lines)
+
+
 def scan_file(path: Path, patterns: list[Pattern]) -> FileResult:
     """Scan a single file against given patterns."""
     result = FileResult(
@@ -82,14 +117,16 @@ def scan_file(path: Path, patterns: list[Pattern]) -> FileResult:
     )
 
     try:
-        content = path.read_text(encoding="utf-8", errors="ignore")
-    except (OSError, UnicodeDecodeError):
-        return result
+        content = path.read_text(encoding="utf-8-sig")
+    except (OSError, UnicodeDecodeError) as exc:
+        raise ScanError(f"Cannot read {path}: {exc}") from exc
 
     lines = content.splitlines()
     result.lines_total = len(lines)
 
     ext = path.suffix
+    code = _python_code(content) if ext == ".py" else content
+    call_rules = {"eval-usage", "exec-usage", "pickle-load", "unsafe-yaml"}
 
     for pattern in patterns:
         if ext not in pattern.languages:
@@ -97,21 +134,17 @@ def scan_file(path: Path, patterns: list[Pattern]) -> FileResult:
 
         try:
             regex = re.compile(pattern.pattern, re.IGNORECASE)
-        except re.error:
-            continue
+        except re.error as exc:
+            raise ScanError(f"Invalid rule {pattern.id}: {exc}") from exc
 
         if pattern.id == "long-function":
             # Special handling: count lines in function bodies
             in_func = False
             func_start = 0
             indent_level = 0
-            for i, line in enumerate(lines, 1):
+            # A sentinel closes the final function at EOF as well as at dedent.
+            for i, line in enumerate(lines + ["<EOF>"], 1):
                 stripped = line.rstrip()
-                if regex.search(stripped):
-                    in_func = True
-                    func_start = i
-                    indent_level = len(line) - len(line.lstrip())
-                    continue
                 if in_func:
                     if stripped == "":
                         continue
@@ -127,15 +160,27 @@ def scan_file(path: Path, patterns: list[Pattern]) -> FileResult:
                                 code=f"Function is {func_lines} lines long",
                             ))
                         in_func = False
+                if regex.search(stripped):
+                    in_func = True
+                    func_start = i
+                    indent_level = len(line) - len(line.lstrip())
+        elif pattern.id == "pass-in-except":
+            for match in regex.finditer(code):
+                line_number = code.count("\n", 0, match.start()) + 1
+                result.findings.append(Finding(
+                    file=str(path), line=line_number, col=0, pattern=pattern,
+                    code=lines[line_number - 1].strip()[:100],
+                ))
         else:
-            for i, line in enumerate(lines, 1):
+            searchable = code.splitlines() if pattern.id in call_rules else lines
+            for i, line in enumerate(searchable, 1):
                 if regex.search(line):
                     result.findings.append(Finding(
                         file=str(path),
                         line=i,
                         col=0,
                         pattern=pattern,
-                        code=line.strip()[:100],
+                        code=lines[i - 1].strip()[:100],
                     ))
 
     return result
@@ -147,23 +192,33 @@ def scan_directory(
     ignore: list[str] | None = None,
 ) -> list[FileResult]:
     """Scan all files in a directory."""
+    if not target.exists():
+        raise ScanError(f"{target} does not exist")
     ignore = ignore or []
     skip = SKIP_DIRS | set(ignore)
     results = []
 
     files: list[Path] = []
     if target.is_file():
-        files = [target]
+        if should_scan(target):
+            files = [target]
     else:
-        for path in target.rglob("*"):
-            if any(part in skip for part in path.parts):
-                continue
-            if path.is_file() and should_scan(path):
-                files.append(path)
+        def walk_error(exc):
+            raise ScanError(f"Cannot traverse {exc.filename}: {exc}") from exc
+
+        for root, directories, filenames in os.walk(target, onerror=walk_error):
+            # Prune before descending, and only inspect names inside the target.
+            directories[:] = [
+                name for name in directories
+                if not any(fnmatch(name, excluded) for excluded in skip)
+            ]
+            for name in filenames:
+                path = Path(root) / name
+                if should_scan(path):
+                    files.append(path)
 
     for f in sorted(files):
         result = scan_file(f, patterns)
-        if result.lines_total > 0:
-            results.append(result)
+        results.append(result)
 
     return results

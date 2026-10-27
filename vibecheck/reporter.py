@@ -3,6 +3,7 @@
 from pathlib import Path
 
 from rich.console import Console
+from rich.markup import escape
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
@@ -18,9 +19,9 @@ SEVERITY_STYLE = {
 }
 
 SEVERITY_ICON = {
-    "critical": "🚨",
-    "warning": "⚠️",
-    "info": "💡",
+    "critical": "!",
+    "warning": "!",
+    "info": "*",
 }
 
 
@@ -45,12 +46,12 @@ def report_rich(
     console.print()
     console.print(
         Panel(
-            f"[bold]VibeCheck[/bold] — AI Code Quality Scanner",
+            f"[bold]VibeCheck[/bold] - AI Code Quality Scanner",
             style="blue",
             padding=(0, 2),
         )
     )
-    console.print(f"\n  Scanning [cyan]{target}[/cyan]...\n")
+    console.print(f"\n  Scanning [cyan]{escape(target)}[/cyan]...\n")
 
     # Collect all findings
     all_findings: list[Finding] = []
@@ -67,7 +68,7 @@ def report_rich(
     console.print(
         Panel(
             f"[bold {score_color}]{score.score}/100[/bold {score_color}]  "
-            f"{score.emoji}  Grade {score.grade}\n\n"
+            f"Grade {score.grade}\n\n"
             f"{score.message}",
             title="[bold]Vibe Score[/bold]",
             border_style=score_color,
@@ -77,25 +78,25 @@ def report_rich(
 
     # ── Stats ───────────────────────────────────────────────────
     console.print(
-        f"\n  [dim]{score.total_files} files · {score.total_lines} lines · "
+        f"\n  [dim]{score.total_files} files - {score.total_lines} lines - "
         f"{score.total_findings} findings[/dim]\n"
     )
 
     # ── Security Issues ─────────────────────────────────────────
     if critical:
-        console.print(f"  🚨 [bold red]Security Issues ({len(critical)})[/bold red]")
+        console.print(f"  ! [bold red]Security Issues ({len(critical)})[/bold red]")
         _print_findings(console, critical, indent="    ")
         console.print()
 
     # ── Warnings ────────────────────────────────────────────────
     if warnings:
-        console.print(f"  ⚠️  [yellow]AI Code Smells ({len(warnings)})[/yellow]")
+        console.print(f"  !  [yellow]AI Code Smells ({len(warnings)})[/yellow]")
         _print_findings(console, warnings, indent="    ")
         console.print()
 
     # ── Info ────────────────────────────────────────────────────
     if infos:
-        console.print(f"  💡 [dim cyan]Suggestions ({len(infos)})[/dim cyan]")
+        console.print(f"  * [dim cyan]Suggestions ({len(infos)})[/dim cyan]")
         _print_findings(console, infos, indent="    ", show_suggestion=False)
         console.print()
 
@@ -108,26 +109,26 @@ def report_rich(
 
     if file_issues:
         sorted_files = sorted(file_issues.items(), key=lambda x: x[1], reverse=True)[:5]
-        console.print("  📁 [bold]Top Files by Issues[/bold]")
+        console.print("  * [bold]Top Files by Issues[/bold]")
         for filepath, count in sorted_files:
-            bar = "█" * min(count, 20)
-            console.print(f"    [dim]{filepath}[/dim] {bar} {count}")
+            bar = "#" * min(count, 20)
+            console.print(f"    [dim]{escape(filepath)}[/dim] {bar} {count}")
         console.print()
 
     # ── Quick Wins ──────────────────────────────────────────────
     quick_wins = _get_quick_wins(all_findings)
     if quick_wins:
-        console.print("  ⚡ [bold green]Quick Wins[/bold green]")
+        console.print("  * [bold green]Quick Wins[/bold green]")
         for win in quick_wins[:5]:
-            console.print(f"    [green]•[/green] {win}")
+            console.print(f"    [green]-[/green] {win}")
         console.print()
 
     # ── Footer ──────────────────────────────────────────────────
     if score.total_findings == 0:
         console.print(
             Panel(
-                "No issues found. Your code is clean!\n\n"
-                "Either you write great code, or the AI is getting really good.",
+                "No configured patterns found in the scanned files.\n\n"
+                "Review the code and use language-specific tools before shipping.",
                 style="green",
                 padding=(1, 2),
             )
@@ -160,10 +161,10 @@ def _print_findings(
 
         console.print(
             f"{indent}[{style}]{f.pattern.name}[/{style}] "
-            f"[dim]{path}:{f.line}[/dim]"
+            f"[dim]{escape(path)}:{f.line}[/dim]"
         )
         if show_suggestion and f.pattern.suggestion:
-            console.print(f"{indent}  [dim]→ {f.pattern.suggestion}[/dim]")
+            console.print(f"{indent}  [dim]-> {f.pattern.suggestion}[/dim]")
 
     remaining = len(unique) - max_items
     if remaining > 0:

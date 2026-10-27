@@ -10,11 +10,11 @@ from rich.console import Console
 from . import __version__
 from .patterns import AI_SMELLS, SECURITY_PATTERNS
 from .reporter import report_json, report_rich
-from .scanner import scan_directory
+from .scanner import ScanError, scan_directory
 from .scorer import calculate_score
 
 app = typer.Typer(
-    name="vibecheck",
+    name="vibechecker",
     help="Audit your AI-generated code. Catch anti-patterns, security issues, and get a vibe score.",
     no_args_is_help=True,
 )
@@ -23,7 +23,7 @@ console = Console()
 
 def version_callback(value: bool):
     if value:
-        console.print(f"vibecheck {__version__}")
+        console.print(f"vibechecker {__version__}")
         raise typer.Exit()
 
 
@@ -48,11 +48,15 @@ def scan(
     no_smells: bool = typer.Option(False, "--no-smells", help="Skip AI smell checks."),
 ):
     """Scan code for AI-generated anti-patterns and security issues."""
-    path = Path(target).resolve()
+    def fail(message: str):
+        if json_out:
+            print(json.dumps({"error": message}))
+        else:
+            Console(stderr=True).print(f"Error: {message}", markup=False)
+        raise typer.Exit(3)
 
-    if not path.exists():
-        console.print(f"[red]Error: {target} does not exist[/red]")
-        raise typer.Exit(1)
+    if (security_only and smells_only) or (security_only and no_security) or (smells_only and no_smells):
+        fail("Conflicting rule-selection options.")
 
     # Select patterns
     patterns = []
@@ -67,7 +71,15 @@ def scan(
             patterns.extend(AI_SMELLS)
 
     # Scan
-    results = scan_directory(path, patterns, ignore=ignore or [])
+    if not patterns:
+        fail("No rules selected. Enable security or AI smell checks.")
+    try:
+        path = Path(target).resolve()
+        results = scan_directory(path, patterns, ignore=ignore or [])
+    except (ScanError, OSError) as exc:
+        fail(str(exc))
+    if not results:
+        fail("No eligible source files found. Use Python, JavaScript, or TypeScript files (at most 500 KB).")
     score = calculate_score(results)
 
     # Output
