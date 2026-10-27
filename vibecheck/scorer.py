@@ -64,7 +64,7 @@ def calculate_score(results: list[FileResult]) -> ScoreResult:
 
     # Determine grade and message
     if score >= 90:
-        grade, emoji, message = "A", "🟢", "Clean code. You understand what you shipped."
+        grade, emoji, message = "A", "🟢", "Few configured patterns found. This is a heuristic score, not a safety guarantee."
     elif score >= 75:
         grade, emoji, message = "B", "🟡", "Mostly solid. A few things to clean up."
     elif score >= 60:
@@ -73,6 +73,9 @@ def calculate_score(results: list[FileResult]) -> ScoreResult:
         grade, emoji, message = "D", "🔴", "Rough. You probably vibe-coded this. Go review."
     else:
         grade, emoji, message = "F", "💀", "Did you even read the code before shipping?"
+
+    if critical:
+        message = "Critical patterns found. Review these findings regardless of the score."
 
     return ScoreResult(
         score=score,

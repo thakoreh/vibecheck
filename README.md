@@ -9,7 +9,7 @@ Catch anti-patterns, security issues, and get a vibe score.
 [![PyPI](https://img.shields.io/pypi/v/vibechecker.svg)](https://pypi.org/project/vibechecker/)
 [![Python](https://img.shields.io/pypi/pyversions/vibechecker.svg)](https://pypi.org/project/vibechecker/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-9%20passing-green)](tests/)
+[![Tests](https://github.com/thakoreh/vibecheck/actions/workflows/ci.yml/badge.svg)](https://github.com/thakoreh/vibecheck/actions/workflows/ci.yml)
 
 </div>
 
@@ -29,6 +29,16 @@ VibeChecker scans your codebase for patterns commonly found in AI-generated code
 - **💡 Suggestions** — overly verbose comments, generic function names, over-documented trivial code
 
 Then it gives you a **vibe score** from 0-100.
+
+This is a local, heuristic scanner. A high score means few configured patterns
+matched; it does not prove code is secure, correct, or AI-generated. Findings
+need human review. Rules do not follow imports, aliases, data flow, or all
+multiline expressions. Python call checks ignore ordinary literal strings and comments;
+Python 3.9-3.11 f-strings are scanned conservatively, including their literal text.
+JavaScript/TypeScript rules remain regex-based and can match examples in strings
+or comments. Use language-specific linters and security tools alongside it.
+Unused-import detection is not provided because matching an import alone cannot
+establish whether it is used.
 
 ## Demo
 
@@ -70,6 +80,11 @@ $ vibechecker scan ./src
 pip install vibechecker
 ```
 
+Requires Python 3.9 or newer. For an isolated install, create a virtual environment
+with `python -m venv .venv`, activate it, then run the command above. On Windows,
+activation is `.venv\Scripts\Activate.ps1`; on macOS/Linux, use
+`source .venv/bin/activate`. `vibechecker --version` shows the installed version.
+
 ## Usage
 
 ```bash
@@ -96,9 +111,24 @@ vibechecker scan . --ignore vendor --ignore generated
 
 | Code | Meaning |
 |------|---------|
-| 0 | Clean, no critical issues |
+| 0 | Score at least 60, no critical patterns found |
 | 1 | Score below 60 |
-| 2 | Critical security issues found |
+| 2 | Critical patterns found |
+| 3 | Scan could not complete: missing/unreadable input, no eligible files, or conflicting rule options |
+
+Exit 2 takes precedence over the score and also covers critical code-smell
+patterns such as bare `except`. Exit 0 means the configured thresholds passed,
+not that the code is safe. With `--json`, operational errors return an
+`{"error": "..."}` object and exit 3; ordinary terminal errors go to stderr.
+CLI syntax errors use exit 2 and show usage.
+
+Only `.py`, `.js`, `.jsx`, `.ts`, and `.tsx` files of at most 500,000 bytes are
+scanned. Empty supported files count as scanned; a directory with no eligible
+files is an error. Source must be UTF-8 (a UTF-8 BOM is accepted); unreadable or
+invalidly encoded source stops the scan rather than producing a partial score.
+Generated/dependency directories are pruned by default. `--ignore` accepts
+directory names or glob patterns relative to the scan target, for example
+`--ignore '*.egg-info'`. Explicit file targets use the same type/size limits.
 
 Perfect for CI pipelines:
 

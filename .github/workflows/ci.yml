@@ -2,16 +2,21 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [master, main]
   pull_request:
-    branches: [main]
+    branches: [master, main]
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        python-version: ["3.9", "3.10", "3.11", "3.12"]
+        os: [ubuntu-latest]
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
+        include:
+          - os: windows-latest
+            python-version: "3.13"
 
     steps:
       - uses: actions/checkout@v4
@@ -24,10 +29,23 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[dev]"
+          pip install -e ".[dev]" build
 
       - name: Run tests
         run: pytest -v
 
       - name: VibeCheck self-scan
         run: python -m vibecheck.cli scan vibecheck/ --no-security
+
+      - name: Build distributions and test installed wheel
+        shell: bash
+        run: |
+          python -m build
+          python -m pip install --force-reinstall --no-deps dist/*.whl
+          python tests/package_smoke.py
+
+      - name: Test source distribution consumer
+        shell: bash
+        run: |
+          python -m pip install --force-reinstall --no-deps dist/*.tar.gz
+          python tests/package_smoke.py
